@@ -1,10 +1,15 @@
 ?- module(plan,
-          [ plan/2,
-            plan_depth/2
+          [ faster_plan/2,
+            take_action/3,
+            update_state/6
           ]).
 
 ?- use_module(queue).
 ?- use_module(actions).
+
+faster_plan(Initial, Story) :-
+    plan(Initial, Story),
+    !.
 
 
 plan(Initial, Story2) :-
@@ -19,7 +24,7 @@ plan_(Q, Story) :-
 
 plan_(Q1, Story) :-
     queue:pop(Q1, (C1, Past), Q2),
-    findall((C2, [A|Past]), take_action(C1, Past, A, C2), As),
+    findall((C2, NewPast), step(C1, Past, C2, NewPast), As),
     queue:push_all(Q2, As, Q3),
     plan_(Q3, Story).
 
@@ -32,9 +37,14 @@ plan_depth_(Initial, Story, Story) :-
     at_goal(Initial).
 
 plan_depth_(C1, Past, Story) :-
-    take_action(C1, Past, D, C2),
-    plan_depth_(C2, [D|Past], Story).
+    step(C1, Past, C2, NewPast),
+    plan_depth_(C2, NewPast, Story).
 
+
+step(State, Past, NewState, NewPast) :-
+   take_action(Action, State, NewState),
+   \+ member(Action, Past),
+   NewPast = [Action|Past].
 
 
 at_goal(T) :-
@@ -44,16 +54,33 @@ at_goal(T) :-
     intersection(T, NonPrereqs, []).
 
 
-take_action(CurrentConditions, Past, Action, NextConditions) :-
-    take_action(CurrentConditions, Action, NextConditions),
-    \+ member(Action, Past).
+take_action(Action, State, NewState) :-
+    action(Action, Prereqs, NegPrereqs, Add, Remove),
+    update_state(Prereqs, NegPrereqs, Add, Remove, State, NewState).
 
-take_action(CurrentConditions, Action, NextConditions) :-
-    action(Action, Prerecs, NegPrerecs, Add, Remove),
-    subset(Prerecs, CurrentConditions),
-    intersection(NegPrerecs, CurrentConditions, []),
-    subtract(CurrentConditions, Remove, C2),
-    append(Add, C2, NextConditions).
+
+update_state(Prereqs, NegPrereqs, Add, Remove, State, NewState) :-
+    subset(Prereqs, State),
+    intersection(NegPrereqs, State, []),
+    intersection(Add, State, []),
+    subtract(State, Remove, S2),
+    remove_singletons(Add, S2, S3),
+    append(Add, S3, NewState).
+
+
+remove_singletons([], State, State).
+
+remove_singletons([A|Add], State, NewState) :-
+    singleton_state(S),
+    copy_term(S, S1),
+    apply((=), [A, S1]),
+    !,
+    subtract(State, [S], State2),
+    remove_singletons(Add, State2, NewState).
+
+remove_singletons([_|Add], State, NewState) :-
+    remove_singletons(Add, State, NewState).
+
 
 
 

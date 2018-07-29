@@ -1,3 +1,3 @@
 # prolog-mooc
 
-Excercises from [SWI-Prolog mooc](https://edu.swi-prolog.org/).
+Excercises from [SWI-Prolog MOOC](https://edu.swi-prolog.org/).
